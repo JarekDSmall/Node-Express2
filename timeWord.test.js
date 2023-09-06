@@ -1,4 +1,4 @@
-const timeToWords = require('./timeword');
+const timeToWords = require('./timeWord');
 
 describe('#timeword', () => {
     test('it is a function', () => {
