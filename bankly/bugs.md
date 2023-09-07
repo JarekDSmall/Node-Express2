@@ -12,3 +12,13 @@ BUG #3: Potential Unhandled Promise Rejection in auth.js Route
 
 Description: The router.post("/register", ...) route in auth.js did not handle potential promise rejections when registering a user.
 Fix: Add a check to ensure that the User.register(req.body) method successfully returns a user.
+
+BUG #4: Incomplete JWT Verification in auth.js Middleware
+
+Description: The authenticateJWT middleware function in auth.js did not properly verify the JWT token.
+Fix: Extract the JWT token from the request body and verify it using the jwt.verify() method.
+
+BUG #5: Potential Missing Error Handling in partialUpdate.js
+
+Description: The sqlForPartialUpdate function in partialUpdate.js did not handle potential errors related to invalid column names.
+Fix: Add a check to ensure that the provided colName exists in the jsToSql mapping.
