@@ -35,14 +35,14 @@ router.get('/', authUser, requireLogin, async function(req, res, next) {
  *
  */
 
-router.get('/:username', authUser, requireLogin, async function(
-  req,
-  res,
-  next
-) {
+router.get("/:username", async function (req, res, next) {
   try {
-    let user = await User.get(req.params.username);
-    return res.json({ user });
+    const result = await db.query(
+      `SELECT username, first_name, last_name, email
+       FROM users 
+       WHERE username=$1`, [req.params.username]
+    );
+    return res.json(result.rows[0]);
   } catch (err) {
     return next(err);
   }
