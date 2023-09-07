@@ -1,17 +1,19 @@
 /** Application for bank.ly */
 
-const express = require('express');
+const express = require("express");
 const app = express();
 const ExpressError = require("./helpers/expressError");
+const { authenticateJWT } = require("./middleware/auth");
 
 
 app.use(express.json());
 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
-
-app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
+
+app.use(authenticateJWT);
+app.use('/auth', authRoutes);
 
 /** 404 handler */
 
@@ -24,15 +26,19 @@ app.use(function(req, res, next) {
 
 /** general error handler */
 
-app.use(function(err, req, res, next) {
-  res.status(err.status || 500);
+function errorHandler(err, req, res, next) {
+  let status = err.status || 500;
+  let message = err.message;
 
-  return res.json({
-    status: err.status,
-    message: err.message
+  return res.status(status).json({
+    error: { message, status }
   });
-});
+}
 
-module.exports = app;
+app.use(errorHandler);
 
-module.exports = app;
+module.exports = {
+  app,
+  errorHandler
+};
+
