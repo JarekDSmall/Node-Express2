@@ -11,34 +11,24 @@
  *
  */
 
-function sqlForPartialUpdate(table, items, key, id) {
-  // keep track of item indexes
-  // store all the columns we want to update and associate with vals
-
-  let idx = 1;
-  let columns = [];
-
-  // filter out keys that start with "_" -- we don't want these in DB
-  for (let key in items) {
-    if (key.startsWith("_")) {
-      delete items[key]
-    }
+function sqlForPartialUpdate(dataToUpdate, jsToSql) {
+  const keys = Object.keys(dataToUpdate);
+  if (keys.length === 0) {
+    throw new BadRequestError("No data");
   }
 
-  for (let column in items) {
-    columns.push(`${column}=$${idx}`);
-    idx += 1;
-  }
+  const cols = keys.map((colName, idx) => {
+    if (!jsToSql[colName]) throw new Error(`Invalid column: ${colName}`);
+    return `${jsToSql[colName]}=$${idx + 1}`;
+  });
 
-  // build query
-  let cols = columns.join(", ");
-  let query = `UPDATE ${table} SET ${cols} WHERE ${key}=$${idx} RETURNING *`;
+  const values = Object.values(dataToUpdate);
 
-  let values = Object.values(items);
-  values.push(id);
-
-  return {query, values};
+  return {
+    setCols: cols.join(", "),
+    values: values,
+  };
 }
 
-
 module.exports = sqlForPartialUpdate;
+
