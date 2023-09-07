@@ -22,3 +22,8 @@ BUG #5: Potential Missing Error Handling in partialUpdate.js
 
 Description: The sqlForPartialUpdate function in partialUpdate.js did not handle potential errors related to invalid column names.
 Fix: Add a check to ensure that the provided colName exists in the jsToSql mapping.
+
+BUG #6: Multiple module.exports in app.js
+
+Description: The app.js file contains two module.exports statements. The second module.exports overrides the first one, which means that only the error-handling middleware is exported, and not the main Express app instance. This can lead to unexpected behavior if other parts of the application are trying to import the app object from app.js.
+Fix: Combine the exports into a single object export, ensuring that both the app object and the error-handling middleware are available for use in other parts of the application.
