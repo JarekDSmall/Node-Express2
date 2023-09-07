@@ -2,7 +2,7 @@
 
 const User = require('../models/user');
 const express = require('express');
-const router = express.Router();
+const router = new express.Router();
 const createTokenForUser = require('../helpers/createToken');
 
 
@@ -14,11 +14,13 @@ const createTokenForUser = require('../helpers/createToken');
  *
  */
 
-router.post('/register', async function(req, res, next) {
+router.post("/register", async function (req, res, next) {
   try {
-    const { username, password, first_name, last_name, email, phone } = req.body;
-    let user = await User.register({username, password, first_name, last_name, email, phone});
-    const token = createTokenForUser(username, user.admin);
+    let user = await User.register(req.body);
+    if (!user) {
+      throw new ExpressError("Registration failed", 400);
+    }
+    let token = createTokenForUser(user);
     return res.status(201).json({ token });
   } catch (err) {
     return next(err);
