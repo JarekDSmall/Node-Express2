@@ -17,12 +17,18 @@ const { authUser, requireLogin, requireAdmin } = require('../middleware/auth');
 
 router.get('/', authUser, requireLogin, async function(req, res, next) {
   try {
-    let users = await User.getAll();
+    let users = await User.findAll();
+    users = users.map(u => ({
+      username: u.username,
+      first_name: u.first_name,
+      last_name: u.last_name,
+      email: u.email
+    }));
     return res.json({ users });
   } catch (err) {
     return next(err);
   }
-}); // end
+});
 
 /** GET /[username]
  *
@@ -63,16 +69,16 @@ router.get("/:username", async function (req, res, next) {
  *
  */
 
-router.patch('/:username', authUser, requireLogin, requireAdmin, async function(
+router.patch('/:username', authUser, requireLogin, async function(
   req,
   res,
   next
 ) {
   try {
-    if (!req.curr_admin && req.curr_username !== req.params.username) {
-      throw new ExpressError('Only  that user or admin can edit a user.', 401);
+    if (req.user.username !== req.params.username && !req.user.is_admin) {
+      throw new ExpressError("Only that user or admin can edit a user.", 401);
     }
-
+    
     // get fields to change; remove token so we don't try to change it
     let fields = { ...req.body };
     delete fields._token;
@@ -82,7 +88,7 @@ router.patch('/:username', authUser, requireLogin, requireAdmin, async function(
   } catch (err) {
     return next(err);
   }
-}); // end
+});
 
 /** DELETE /[username]
  *
@@ -100,11 +106,11 @@ router.delete('/:username', authUser, requireAdmin, async function(
   next
 ) {
   try {
-    User.delete(req.params.username);
+    await User.delete(req.params.username); // Added await to ensure the user is deleted before sending a response
     return res.json({ message: 'deleted' });
   } catch (err) {
     return next(err);
   }
-}); // end
+});
 
 module.exports = router;
