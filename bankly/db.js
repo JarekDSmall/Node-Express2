@@ -1,10 +1,11 @@
-/** Database setup for jobly. */
+const { Pool } = require("pg");
+const { DB_URI } = require("./config");
 
-const { Client } = require('pg');
-const { DB_URI } = require('./config');
+// Use a connection pool instead of a single 
+const pool = new Pool({
+  connectionString: DB_URI
+});
 
-const client = new Client(DB_URI);
-
-client.connect();
-
-module.exports = client;
+module.exports = {
+  query: (text, params) => pool.query(text, params),
+};
