@@ -5,6 +5,8 @@ const express = require('express');
 const router = new express.Router();
 const ExpressError = require('../helpers/expressError');
 const { authUser, requireLogin, requireAdmin } = require('../middleware/auth');
+const db = require('../db');
+
 
 /** GET /
  *
@@ -41,14 +43,13 @@ router.get('/', authUser, requireLogin, async function(req, res, next) {
  *
  */
 
-router.get("/:username", async function (req, res, next) {
+router.get("/:username", authUser, requireLogin, async function (req, res, next) {
   try {
-    const result = await db.query(
-      `SELECT username, first_name, last_name, email
-       FROM users 
-       WHERE username=$1`, [req.params.username]
-    );
-    return res.json(result.rows[0]);
+    const user = await User.findOne(req.params.username);
+    if (!user) {
+      throw new ExpressError("User not found", 404);
+    }
+    return res.json({ user });
   } catch (err) {
     return next(err);
   }
