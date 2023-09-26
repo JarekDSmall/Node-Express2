@@ -1,77 +1,57 @@
-/** Middleware for handling req authorization for routes. */
+const jwt = require("jsonwebtoken");
+const { SECRET_KEY } = require("../config");
 
-const jwt = require('jsonwebtoken');
-const { SECRET_KEY } = require('../config');
-const ExpressError = require("../helpers/expressError");
+/** Middleware: Authenticate user. */
+function authUser(req, res, next) {
+  try {
+    const tokenFromBody = req.body._token;
+    const payload = jwt.verify(tokenFromBody, SECRET_KEY);
+    req.user = payload; // create a current user
+    return next();
+  } catch (err) {
+    return next();
+  }
+}
 
-function ensureLoggedIn(req, res, next) {
+/** Middleware: Requires user is authenticated. */
+function requireLogin(req, res, next) {
   if (!req.user) {
-    return next(new ExpressError("Unauthorized", 401));
+    return res.status(401).json({ message: "Unauthorized" });
   } else {
     return next();
   }
 }
 
-/** Authorization Middleware: Requires user is logged in. */
-
-function requireLogin(req, res, next) {
+/** Middleware: Requires correct username. */
+function ensureCorrectUser(req, res, next) {
   try {
-    if (req.curr_username) {
+    if (req.user.username === req.params.username) {
       return next();
     } else {
-      return next({ status: 401, message: 'Unauthorized' });
+      return res.status(401).json({ message: "Unauthorized" });
     }
   } catch (err) {
-    return next(err);
+    // errors would happen here if we made a request and req.user is undefined
+    return res.status(401).json({ message: "Unauthorized" });
   }
 }
 
-/** Authorization Middleware: Requires user is logged in and is staff. */
-
+/** Middleware: Requires user is an admin. */
 function requireAdmin(req, res, next) {
   try {
-    if (req.curr_admin) {
+    if (req.user && req.user.is_admin) {
       return next();
     } else {
-      return next({ status: 401, message: 'Unauthorized' });
+      return res.status(403).json({ message: "Forbidden: Admin privileges required" });
     }
   } catch (err) {
-    return next(err);
-  }
-}
-
-/** Authentication Middleware: put user on request
- *
- * If there is a token, verify it, get payload (username/admin),
- * and store the username/admin on the request, so other middleware/routes
- * can use it.
- *
- * It's fine if there's no token---if not, don't set anything on the
- * request.
- *
- * If the token is invalid, an error will be raised.
- *
- **/
-
-function authUser(req, res, next) {
-  try {
-    const token = req.body._token || req.query._token;
-    if (token) {
-      let payload = jwt.verify(token, SECRET_KEY);
-      req.user = payload;
-      req.curr_username = payload.username;
-      req.curr_admin = payload.admin;
-    }
-    return next();
-  } catch (err) {
-    err.status = 401;
-    return next(err);
+    return res.status(403).json({ message: "Forbidden: Admin privileges required" });
   }
 }
 
 module.exports = {
   authUser,
-  ensureLoggedIn,
   requireLogin,
+  ensureCorrectUser,
   requireAdmin
 };
