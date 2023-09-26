@@ -5,7 +5,7 @@
   "main": "app.js",
   "scripts": {
     "test": "jest",
-    "seed": "dropdb bankly && createdb bankly && psql bankly < data.sql && dropdb bankly_test && createdb bankly_test && psql bankly_test < data.sql",
+    "seed": "dropdb --if-exists bankly && createdb bankly && psql bankly < data.sql && dropdb --if-exists bankly_test && createdb bankly_test && psql bankly_test < data.sql",
     "start": "node server.js"
   },
   "author": "",
@@ -15,7 +15,7 @@
     "dotenv": "^8.2.0",
     "express": "^4.16.4",
     "jsonwebtoken": "^9.0.2",
-    "pg": "^8.3.0",
+    "pg": "^8.11.3",
     "supertest": "^3.3.0"
   },
   "devDependencies": {
