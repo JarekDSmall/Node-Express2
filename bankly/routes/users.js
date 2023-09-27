@@ -4,7 +4,7 @@ const User = require('../models/user');
 const express = require('express');
 const router = new express.Router();
 const ExpressError = require('../helpers/expressError');
-const { authUser, requireLogin, requireAdmin } = require('../middleware/auth');
+const { authUser, ensureCorrectUser, requireAdmin } = require('../middleware/auth');
 const db = require('../db');
 
 
@@ -17,20 +17,22 @@ const db = require('../db');
  *
  */
 
-router.get('/', authUser, requireLogin, async function(req, res, next) {
+// Updated Listing Route Handler in users.js
+router.get("/", authUser, async function (req, res, next) {
   try {
     let users = await User.findAll();
     users = users.map(u => ({
       username: u.username,
       first_name: u.first_name,
       last_name: u.last_name,
-      email: u.email
     }));
     return res.json({ users });
   } catch (err) {
     return next(err);
   }
 });
+
+
 
 /** GET /[username]
  *
@@ -43,17 +45,24 @@ router.get('/', authUser, requireLogin, async function(req, res, next) {
  *
  */
 
-router.get("/:username", authUser, requireLogin, async function (req, res, next) {
+router.get("/:username", authUser, async function (req, res, next) {
   try {
     const user = await User.findOne(req.params.username);
     if (!user) {
       throw new ExpressError("User not found", 404);
     }
+
+    // Check if the requester is either the user themselves or an admin
+    if (req.user.username !== req.params.username && !req.user.is_admin) {
+      throw new ExpressError("Unauthorized", 401);
+    }
+
     return res.json({ user });
   } catch (err) {
     return next(err);
   }
 });
+
 
 /** PATCH /[username]
  *
@@ -70,26 +79,35 @@ router.get("/:username", authUser, requireLogin, async function (req, res, next)
  *
  */
 
-router.patch('/:username', authUser, requireLogin, async function(
-  req,
-  res,
-  next
-) {
+router.patch("/:username", authUser, ensureCorrectUser, async function (req, res, next) {
   try {
+    // Check if the user is allowed to patch themselves
     if (req.user.username !== req.params.username && !req.user.is_admin) {
-      throw new ExpressError("Only that user or admin can edit a user.", 401);
+      throw new ExpressError("Unauthorized", 401);
     }
-    
-    // get fields to change; remove token so we don't try to change it
+
+    // Check for fields that should not be allowed
+    const disallowedFields = ["username", "admin"];
+    for (const field of disallowedFields) {
+      if (field in req.body) {
+        throw new ExpressError(`Cannot update '${field}' field`, 401);
+      }
+    }
+
     let fields = { ...req.body };
     delete fields._token;
 
     let user = await User.update(req.params.username, fields);
+    if (!user) {
+      throw new ExpressError("User not found", 404);
+    }
+
     return res.json({ user });
   } catch (err) {
     return next(err);
   }
 });
+
 
 /** DELETE /[username]
  *
@@ -101,17 +119,19 @@ router.patch('/:username', authUser, requireLogin, async function(
  * If user cannot be found, return a 404 err.
  */
 
-router.delete('/:username', authUser, requireAdmin, async function(
-  req,
-  res,
-  next
-) {
+router.delete('/:username', authUser, requireAdmin, async function (req, res, next) {
   try {
+    const user = await User.findOne(req.params.username);
+    if (!user) {
+      throw new ExpressError("User not found", 404);
+    }
+
     await User.delete(req.params.username); // Added await to ensure the user is deleted before sending a response
     return res.json({ message: 'deleted' });
   } catch (err) {
     return next(err);
   }
 });
+
 
 module.exports = router;
