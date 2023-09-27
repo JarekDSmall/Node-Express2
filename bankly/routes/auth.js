@@ -3,11 +3,12 @@ const router = new express.Router();
 const User = require("../models/user");
 const { createToken } = require("../helpers/createToken");
 
+// Updated Login Route Handler in auth.js
 router.post("/login", async function (req, res, next) {
   try {
-    // Add input validation here
-    const user = await User.authenticate(req.body);
-    const token = createToken(user);
+    const { username, password } = req.body;
+    const user = await User.authenticate(username, password);
+    const token = createToken(user.username, user.is_admin);
     return res.json({ token });
   } catch (err) {
     return next(err);
