@@ -1,67 +1,79 @@
-const jwt = require("jsonwebtoken");
-const { SECRET_KEY } = require("../config");
-const ExpressError = require("../expressError");
+/** Middleware for handling req authorization for routes. */
 
-/** Middleware: Authenticate user. */
-function authUser(req, res, next) {
+const jwt = require('jsonwebtoken');
+const { SECRET_KEY } = require('../config');
+
+/** Authorization Middleware: Requires user is logged in. */
+
+function requireLogin(req, res, next) {
   try {
-
-    console.log('Authorization Header:', req.headers.authorization);
-
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      throw new ExpressError("Unauthorized: Token missing", 401);
+    if (req.curr_username || req.curr_admin) {
+      return next();
+    } else {
+      return next({ status: 401, message: 'Unauthorized' });
     }
-
-    const token = authHeader.split(" ")[1];
-    if (!token) {
-      throw new ExpressError("Unauthorized: Token malformed", 401);
-    }
-
-// Check if the token has three parts separated by dots
-    const tokenParts = token.split(".");
-    if (tokenParts.length !== 3) {
-      throw new ExpressError("Unauthorized: Token malformed", 401);
-    }
-
-    // Log the received token
-    console.log('Received Token:', token);
-
-    const payload = jwt.verify(token, SECRET_KEY);
-    req.user = payload;
-
-    return next();
   } catch (err) {
     return next(err);
   }
 }
 
-/** Middleware: Requires correct username. */
-function ensureCorrectUser(req, res, next) {
-  try {
-    if (!req.user || req.user.username !== req.params.username) {
-      throw new ExpressError("Unauthorized: Incorrect username", 401);
-    }
-    return next();
-  } catch (err) {
-    return next(err);
-  }
-}
 
-/** Middleware: Requires user to be an admin. */
+/** Authorization Middleware: Requires user is logged in and is staff. */
+
 function requireAdmin(req, res, next) {
   try {
-    if (!req.user || !req.user.is_admin) {
-      throw new ExpressError("Forbidden: Admin privileges required", 403);
+    if (req.curr_admin) {
+      return next();
+    } else {
+      return next({ status: 401, message: 'Unauthorized' });
     }
-    return next();
   } catch (err) {
     return next(err);
   }
 }
 
+/** Authentication Middleware: put user on request
+ *
+ * If there is a token, verify it, get payload (username/admin),
+ * and store the username/admin on the request, so other middleware/routes
+ * can use it.
+ *
+ * It's fine if there's no token---if not, don't set anything on the
+ * request.
+ *
+ * If the token is invalid, an error will be raised.
+ *
+ **/
+
+function authUser(req, res, next) {
+  try {
+    const token = req.body._token || req.query._token;
+
+    // Log the token value
+    console.log("Token:", token);
+
+    if (token) {
+      let payload = jwt.verify(token, SECRET_KEY); // FIX for Bug #6
+
+      // Log the payload after decoding the token
+      console.log("Decoded Payload:", payload);
+
+      req.curr_username = payload.username;
+      req.curr_admin = payload.admin;
+
+      // Log the values set on the request object
+      console.log("curr_username:", req.curr_username, "curr_admin:", req.curr_admin);
+    }
+    return next();
+  } catch (err) {
+    err.status = 401;
+    return next(err);
+  }
+}
+ // end
+
 module.exports = {
-  authUser,
-  ensureCorrectUser,
+  requireLogin,
   requireAdmin,
+  authUser
 };

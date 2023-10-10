@@ -4,9 +4,9 @@ const User = require('../models/user');
 const express = require('express');
 const router = new express.Router();
 const ExpressError = require('../helpers/expressError');
-const { authUser, ensureCorrectUser, requireAdmin } = require('../middleware/auth');
-const db = require('../db');
+const { authUser, requireLogin, requireAdmin } = require('../middleware/auth');
 
+const ALLOWED_FIELDS = ["first_name", "last_name", "phone", "email"];
 
 /** GET /
  *
@@ -16,23 +16,15 @@ const db = require('../db');
  *    {users: [{username, first_name, last_name}, ...]}
  *
  */
-
-// Updated Listing Route Handler in users.js
-router.get("/", authUser, async function (req, res, next) {
+// FIXES BUG #2: Listing Route Should Not Return All Fields
+router.get('/', authUser, requireLogin, async function(req, res, next) {
   try {
-    let users = await User.findAll();
-    users = users.map(u => ({
-      username: u.username,
-      first_name: u.first_name,
-      last_name: u.last_name,
-    }));
-    return res.json({ users });
+    let users = await User.getAll();
+    return res.json({ users: users.map(u => ({ username: u.username, first_name: u.first_name, last_name: u.last_name })) });
   } catch (err) {
     return next(err);
   }
 });
-
-
 
 /** GET /[username]
  *
@@ -44,25 +36,14 @@ router.get("/", authUser, async function (req, res, next) {
  * If user cannot be found, return a 404 err.
  *
  */
-
-router.get("/:username", authUser, async function (req, res, next) {
+router.get('/:username', authUser, requireLogin, async function(req, res, next) {
   try {
-    const user = await User.findOne(req.params.username);
-    if (!user) {
-      throw new ExpressError("User not found", 404);
-    }
-
-    // Check if the requester is either the user themselves or an admin
-    if (req.user.username !== req.params.username && !req.user.is_admin) {
-      throw new ExpressError("Unauthorized", 401);
-    }
-
+    let user = await User.get(req.params.username);
     return res.json({ user });
   } catch (err) {
     return next(err);
   }
 });
-
 
 /** PATCH /[username]
  *
@@ -78,19 +59,27 @@ router.get("/:username", authUser, async function (req, res, next) {
  * other fields (including non-existent ones), an error should be raised.
  *
  */
-
-router.patch("/:username", authUser, ensureCorrectUser, async function (req, res, next) {
+router.patch('/:username', authUser, requireLogin, async function(req, res, next) {
   try {
-    // Check if the user is allowed to patch themselves
-    if (req.user.username !== req.params.username && !req.user.is_admin) {
-      throw new ExpressError("Unauthorized", 401);
+    // Check if the user exists first
+    const userExists = await User.get(req.params.username);
+    if (!userExists) {
+      throw new ExpressError('No such user', 404);
     }
 
-    // Check for fields that should not be allowed
-    const disallowedFields = ["username", "admin"];
-    for (const field of disallowedFields) {
-      if (field in req.body) {
-        throw new ExpressError(`Cannot update '${field}' field`, 401);
+    // Logging to troubleshoot
+    console.log('req.curr_admin:', req.curr_admin);
+    console.log('req.curr_username:', req.curr_username);
+
+    // FIXES BUG #3: Users Should Be Able to Patch Themselves
+    if (!req.curr_admin && req.curr_username !== req.params.username) {
+      throw new ExpressError('Only that user or admin can edit a user.', 401);
+    }
+
+    // FIXES BUG #4: Users Should Not Be Able to Patch Username/Admin/Other Fields
+    for (let field in req.body) {
+      if (!ALLOWED_FIELDS.includes(field)) {
+        throw new ExpressError('Not allowed to update this field', 401);
       }
     }
 
@@ -98,10 +87,6 @@ router.patch("/:username", authUser, ensureCorrectUser, async function (req, res
     delete fields._token;
 
     let user = await User.update(req.params.username, fields);
-    if (!user) {
-      throw new ExpressError("User not found", 404);
-    }
-
     return res.json({ user });
   } catch (err) {
     return next(err);
@@ -118,20 +103,14 @@ router.patch("/:username", authUser, ensureCorrectUser, async function (req, res
  *
  * If user cannot be found, return a 404 err.
  */
-
-router.delete('/:username', authUser, requireAdmin, async function (req, res, next) {
+router.delete('/:username', authUser, requireAdmin, async function(req, res, next) {
   try {
-    const user = await User.findOne(req.params.username);
-    if (!user) {
-      throw new ExpressError("User not found", 404);
-    }
-
-    await User.delete(req.params.username); // Added await to ensure the user is deleted before sending a response
+    // FIXES BUG #5: Deletion Always Reports Success
+    await User.delete(req.params.username);
     return res.json({ message: 'deleted' });
   } catch (err) {
     return next(err);
   }
 });
-
 
 module.exports = router;
